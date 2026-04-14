@@ -1,25 +1,66 @@
 # Elections go bananas: A First Large-scale Multilingual Study of Pluralia Tantum using LLMs
 
-This repository includes the evaluation scripts used in the paper.
+[![Paper](https://img.shields.io/badge/Paper-EACL%202026-blue)](https://aclanthology.org/2026.eacl-long.308/)
+[![License](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey)](https://creativecommons.org/licenses/by/4.0/)
 
-## `llm_classifier` — LLM Annotation & Evaluation Toolkit
+> Elena Spaziani, Kamyar Zeinalipour, Pierluigi Cassotti, Nina Tahmasebi
+>
+> *Proceedings of the 19th Conference of the European Chapter of the Association for Computational Linguistics (EACL 2026), Rabat, Morocco*
 
-A modular Python package for annotating linguistic data with LLMs and evaluating the results.
+## Overview
 
-### Installation
+**Pluralia tantum** are defective nouns that lack a singular form (e.g., *scissors*, *trousers*, *elections*). This paper presents the first large-scale, multilingual study of how pluralia tantum evolve in meaning across **Italian**, **Russian**, and **English**, using Large Language Models as automated annotators.
+
+We introduce `llm_classifier`, a modular toolkit for:
+
+1. **Annotating** corpus instances of pluralia tantum according to *Lexicalization Profiles* — a framework capturing sense inventory, sense relations (primary, metaphoric, metonymic, taxonomic), semantic features, morphological case, colligations, register, and text theme.
+2. **Evaluating** LLM annotation quality against hand-annotated gold standards using Exact Match Accuracy, Jaccard Similarity, and Micro-F1 scores.
+3. **Visualizing** cross-model and cross-language results with publication-quality plots.
+
+### Key Findings
+
+- OpenAI and DeepSeek models achieve **51%–89% accuracy** averaged across all feature groups and languages, making them viable annotators for large-scale linguistic studies.
+- Using dictionaries, we extract candidate pluralia tantum words and retain those where the **singular/plural ratio shift** is evident in reference corpora.
+- Automatically annotated data reveals **patterns of morpho-semantic change** — correlations between annotated features and grammatical form (singular vs. plural) that would be infeasible to discover through manual annotation alone.
+
+## Repository Structure
+
+```
+├── llm_classifier/          # Core Python package
+│   ├── core.py              # Annotator: multi-model LLM annotation with resume
+│   ├── parser.py            # Parser: robust JSON extraction from LLM outputs
+│   ├── evaluator.py         # Evaluator: multi-label metrics computation
+│   └── cli.py               # Command-line interface
+├── evaluate.py              # Batch evaluation across datasets and models
+├── parse_outputs.py         # Batch JSON parsing of raw LLM outputs
+├── plot_results.py          # Publication-quality bar chart generation
+├── config/                  # Prompt templates (system messages, zero/few-shot)
+├── data/                    # Input datasets (per-language CSVs)
+├── english/                 # English-specific data
+├── italian/                 # Italian-specific data
+├── russian/                 # Russian-specific data
+└── src/                     # Additional analysis scripts
+```
+
+## Installation
 
 ```bash
 pip install openai pandas scikit-learn numpy matplotlib seaborn
 ```
 
-### Features
+## Annotation Framework
 
-- **Multi-model support**: Runs the same prompt across multiple OpenAI and DeepSeek models in a single command.
-- **Resume-safe**: If a run is interrupted, re-running the same command will pick up where it left off.
-- **Flexible prompts**: Reference any CSV column in your prompt template via `{column_name}` placeholders.
-- **Robust parsing**: Extracts JSON from messy LLM outputs using regex + `ast.literal_eval` fallback.
-- **Multi-label evaluation**: Computes Exact Match Accuracy, Jaccard Similarity, and Micro-F1 scores.
-- **Publication-quality plots**: Generates bar charts comparing model performance across annotation categories.
+The annotation follows the **Lexicalization Profiles** framework with the following categories:
+
+| Category | Description | Example Values |
+|----------|-------------|----------------|
+| **Sense Inventory** | Which meaning of the word is used | `1.01` (general talk), `2.01` (formal discussion), `3.01` (censure) |
+| **Sense Categories** | Semantic derivation mechanism | `primary`, `metaphoric`, `metonymic`, `taxonomic` |
+| **Semantic Categories** | Concreteness and animacy | `[abstract, inanimate]` |
+| **Morphological Categories** | Grammatical case | `nominative`, `genitive`, `dative`, etc. |
+| **Colligation L1/R1** | POS of adjacent words | `noun`, `verb`, `preposition`, etc. |
+| **Diaphasic Preference** | Register level | `neutral`, `specialized` |
+| **Text Theme** | Thematic domain of the source text | `politics`, `law`, `daily life`, `literature`, etc. |
 
 ### Supported Models
 
@@ -148,6 +189,8 @@ print(metrics)
 
 ## Citation
 
+If you use this code or data, please cite our paper:
+
 ```bibtex
 @inproceedings{spaziani-etal-2026-elections,
     title = "Elections go bananas: A First Large-scale Multilingual Study of Pluralia Tantum using {LLM}s",
@@ -167,6 +210,9 @@ print(metrics)
     doi = "10.18653/v1/2026.eacl-long.308",
     pages = "6547--6570",
     ISBN = "979-8-89176-380-7",
-    abstract = "In this paper, we study the expansion of pluralia tantum, i.e., defective nouns which lack a singular form, like scissors. We base our work on an annotation framework specifically developed for the study of lexicalization of pluralia tantum, namely Lexicalization profiles. On a corresponding hand-annotated testset, we show that the OpenAI and DeepSeek models provide useful annotators for semantic, syntactic and sense categories, with accuracy ranging from 51{\%} to 89{\%}, averaged across all feature groups and languages. Next, we turn to a large-scale investigation of pluralia tantum. Using dictionaries, we extract candidate words for Italian, Russian and English and keep those for which the changing ratio of singular and plural form is evident in a corresponding reference corpus. We use an LLM to annotate each instance from the reference corpora according to the annotation framework. We show that the large amount of automatically annotated sentences for each feature can be used to perform in-depth linguistic analysis. Focusing on the correlation between an annotated feature and the grammatical form (singular vs. plural), patterns of morpho-semantic change are noted."
 }
 ```
+
+## License
+
+This work is licensed under a [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).
