@@ -9,14 +9,33 @@ A modular Python package for annotating linguistic data with LLMs and evaluating
 ### Installation
 
 ```bash
-pip install openai pandas scikit-learn numpy
+pip install openai pandas scikit-learn numpy matplotlib seaborn
 ```
 
-### Quick Start
+### Features
 
-#### 1. Annotate (Zero-Shot)
+- **Multi-model support**: Runs the same prompt across multiple OpenAI and DeepSeek models in a single command.
+- **Resume-safe**: If a run is interrupted, re-running the same command will pick up where it left off.
+- **Flexible prompts**: Reference any CSV column in your prompt template via `{column_name}` placeholders.
+- **Robust parsing**: Extracts JSON from messy LLM outputs using regex + `ast.literal_eval` fallback.
+- **Multi-label evaluation**: Computes Exact Match Accuracy, Jaccard Similarity, and Micro-F1 scores.
+- **Publication-quality plots**: Generates bar charts comparing model performance across annotation categories.
+
+### Supported Models
+
+| Provider | Models |
+|----------|--------|
+| OpenAI | `gpt-4o`, `gpt-4o-mini`, `chatgpt-4o-latest`, `o1`, `o3-mini`, `o3`, `gpt-4.1-*` |
+| DeepSeek | `deepseek-chat`, `deepseek-reasoner` |
+
+---
+
+## Full Pipeline
+
+### Step 1 — Annotate
 
 ```bash
+# Zero-shot
 python -m llm_classifier.cli annotate \
     -i data/your_data.csv \
     -o results/ \
@@ -26,11 +45,8 @@ python -m llm_classifier.cli annotate \
     --system-message config/system_message.txt \
     --prompt-template config/prompt_zeroshot.txt \
     --prompt-columns text_clean
-```
 
-#### 2. Annotate (Few-Shot)
-
-```bash
+# Few-shot (same command, different prompt template)
 python -m llm_classifier.cli annotate \
     -i data/your_data.csv \
     -o results/ \
@@ -42,30 +58,71 @@ python -m llm_classifier.cli annotate \
     --temperature 0.7
 ```
 
-#### 3. Evaluate
+### Step 2 — Parse outputs
+
+Extract structured JSON from raw LLM responses:
 
 ```bash
-python -m llm_classifier.cli evaluate \
-    -p results/output_gpt-4o-mini.csv \
-    -g data/gold_standard.csv
+python parse_outputs.py --output-dir results/
 ```
 
-### Features
+This scans all model subdirectories in `results/`, extracts JSON from output columns, and writes parsed fields back into the CSVs. A `parsing_report.csv` is generated listing any rows that failed to parse.
 
-- **Multi-model support**: Runs the same prompt across multiple OpenAI and DeepSeek models in a single command.
-- **Resume-safe**: If a run is interrupted, re-running the same command will pick up where it left off.
-- **Flexible prompts**: Reference any CSV column in your prompt template via `{column_name}` placeholders.
-- **Robust parsing**: Extracts JSON from messy LLM outputs using regex + `ast.literal_eval` fallback.
-- **Multi-label evaluation**: Computes Exact Match Accuracy, Jaccard Similarity, and Micro-F1 scores.
+### Step 3 — Evaluate
 
-### Supported Models
+Compare predictions against ground truth:
 
-| Provider | Models |
-|----------|--------|
-| OpenAI | `gpt-4o`, `gpt-4o-mini`, `chatgpt-4o-latest`, `o1`, `o3-mini`, `o3`, `gpt-4.1-*` |
-| DeepSeek | `deepseek-chat`, `deepseek-reasoner` |
+```bash
+python evaluate.py \
+    --data data/ \
+    --predictions results/ \
+    --output evaluations/
+```
 
-### Python API
+**Outputs:**
+- `evaluations/<dataset>_evaluated.csv` — per-dataset metrics
+- `evaluations/all_datasets_evaluated.csv` — combined results
+- `evaluations/summary_by_model_label.csv` — averaged by model & label
+
+### Step 4 — Plot results
+
+Generate publication-quality bar charts:
+
+```bash
+# Overall plot (all languages averaged)
+python plot_results.py \
+    --input evaluations/summary_by_model_label.csv \
+    --metric jaccard_score
+
+# Per-language plots
+python plot_results.py \
+    --input evaluations/all_datasets_evaluated.csv \
+    --by-language \
+    --lang-map lang_map.json
+
+# Other metrics: exact_match_accuracy, f1_micro, precision_micro, recall_micro
+python plot_results.py \
+    --input evaluations/summary_by_model_label.csv \
+    --metric exact_match_accuracy
+```
+
+Figures are saved to `figs/` as both PDF and PNG.
+
+For `--by-language`, provide a JSON file mapping dataset names to languages:
+```json
+{
+    "peregovor": "Russian",
+    "koska": "Russian",
+    "condoglianza": "Italian",
+    "urna": "Italian",
+    "banana": "English",
+    "hostility": "English"
+}
+```
+
+---
+
+## Python API
 
 ```python
 from llm_classifier import Annotator, Parser, Evaluator
