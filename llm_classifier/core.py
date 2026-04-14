@@ -26,6 +26,9 @@ class Annotator:
     * A prompt template can reference any column via ``{column_name}``.
     * One ``output_<model>.csv`` file is written per model so runs
       can be resumed safely.
+
+    Supports OpenAI and DeepSeek models with automatic client routing,
+    configurable temperature, and exponential-backoff retries.
     """
 
     DEEPSEEK_MODELS = {"deepseek-chat", "deepseek-reasoner"}
@@ -42,6 +45,8 @@ class Annotator:
         prompt_template_path: Optional[str] = None,
         prompt_columns: Optional[List[str]] = None,
         retry_delay: int = 300,
+        max_retries: int = 3,
+        temperature: Optional[float] = None,
         debug: bool = False,
     ) -> None:
         self.openai_api_key = openai_api_key
@@ -49,6 +54,8 @@ class Annotator:
         self.models = models or []
         self.prompt_columns = prompt_columns
         self.retry_delay = retry_delay
+        self.max_retries = max_retries
+        self.temperature = temperature
         self.debug = debug
 
         # turn on verbose logging when requested
@@ -87,7 +94,7 @@ class Annotator:
         Otherwise every column in the row is available for substitution.
         """
         if not self.prompt_template:
-            # fallback: just send the raw text (or an empty string)
+            # fallback: just send the raw text (or an empty string)
             return str(row.get("text_clean", ""))
 
         prompt = self.prompt_template
@@ -104,7 +111,15 @@ class Annotator:
             messages.append({"role": "system", "content": self.system_message})
         messages.append({"role": "user", "content": prompt})
 
-        resp = client.chat.completions.create(model=model, messages=messages)
+        kwargs = {"model": model, "messages": messages}
+
+        # Some reasoning models (o1, o3) do not support temperature
+        if self.temperature is not None and not (
+            model.startswith("o1") or model.startswith("o3")
+        ):
+            kwargs["temperature"] = self.temperature
+
+        resp = client.chat.completions.create(**kwargs)
         return resp.choices[0].message.content.strip()
 
     # --------------------------------------------------------------------- #
@@ -123,8 +138,7 @@ class Annotator:
         df["output_json"] = df.get("output_json", pd.NA)
 
         for model in self.models:
-            if self.debug:
-                logger.info(f"▶ Running model “{model}”")
+            logger.info(f"▶ Running model \"{model}\"")
 
             out_path = os.path.join(output_dir, f"output_{model}.csv")
             start_idx = 0
@@ -137,6 +151,7 @@ class Annotator:
                 df.loc[: start_idx - 1, "output_json"] = df_exist.loc[
                     : start_idx - 1, "output_json"
                 ]
+                logger.info(f"  Resuming from row {start_idx}")
 
             client = self._get_client(model)
 
@@ -152,14 +167,24 @@ class Annotator:
                         f"── Prompt example for {model} (row {idx}):\n{prompt}\n"
                     )
 
-                try:
-                    out = self._get_completion(client, prompt, model)
-                except Exception as e:
-                    logger.error(
-                        f"Error on {model} row {idx}: {e}, retrying in {self.retry_delay}s..."
-                    )
-                    time.sleep(self.retry_delay)
-                    out = self._get_completion(client, prompt, model)
+                # Retry loop with exponential backoff
+                for attempt in range(self.max_retries):
+                    try:
+                        out = self._get_completion(client, prompt, model)
+                        break
+                    except Exception as e:
+                        wait = self.retry_delay * (attempt + 1)
+                        logger.error(
+                            f"Error on {model} row {idx} (attempt {attempt + 1}/{self.max_retries}): "
+                            f"{e}, retrying in {wait}s..."
+                        )
+                        if attempt < self.max_retries - 1:
+                            time.sleep(wait)
+                        else:
+                            logger.error(f"Skipping row {idx} after {self.max_retries} failures.")
+                            out = None
 
                 df.at[idx, "output_json"] = out
                 df.to_csv(out_path, index=False)
+
+            logger.info(f"✔ Finished model \"{model}\", saved to {out_path}")

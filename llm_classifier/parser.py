@@ -6,7 +6,7 @@ Example
 from llm_classifier.parser import Parser
 
 parser = Parser(verbose=True)          # see failures while parsing
-df_parsed = parser.parse_csv("results_matched/system1/output_gpt-4o-mini.csv")
+df_parsed = parser.parse_csv("results/output_gpt-4o-mini.csv")
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import re
 import ast
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Dict
 
 import pandas as pd
 
@@ -23,12 +23,10 @@ class Parser:
     """
     Extract JSON / dict objects from LLM outputs and normalise them into columns.
 
-    Improvements over the original version
-    --------------------------------------
-    * non-greedy regex (`{.*?}`) so we don't swallow the whole message
-    * tries `json.loads` **then** `ast.literal_eval`
+    * non-greedy regex (``{.*?}``) so we don't swallow the whole message
+    * tries ``json.loads`` **then** ``ast.literal_eval``
     * scans **all** brace-blocks in the cell; stops at the first that parses
-    * optional `verbose` flag to print rows that cannot be parsed
+    * optional ``verbose`` flag to print rows that cannot be parsed
     """
 
     BRACE_RE = re.compile(r"\{.*?\}", re.DOTALL)
@@ -39,7 +37,7 @@ class Parser:
     # ──────────────────────────────────────────────────────────────────
     # core helpers
     # ──────────────────────────────────────────────────────────────────
-    def _parse_block(self, text: str) -> dict | None:
+    def _parse_block(self, text: str) -> Optional[Dict]:
         """Try JSON first, then Python literal-eval."""
         try:
             return json.loads(text)
@@ -50,7 +48,7 @@ class Parser:
         except Exception:
             return None
 
-    def extract_json(self, cell: Any) -> dict | None:
+    def extract_json(self, cell: Any) -> Optional[Dict]:
         """Return a dict if we can parse **any** { ... } in the cell."""
         if not isinstance(cell, str):
             return None

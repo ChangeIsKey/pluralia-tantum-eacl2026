@@ -17,6 +17,9 @@ def main():
     ann.add_argument('--system-message', help='Path to system message file')
     ann.add_argument('--prompt-template', help='Path to prompt template file')
     ann.add_argument('--prompt-columns', nargs='+', help='CSV column names to inject into prompt')
+    ann.add_argument('--temperature', type=float, default=None, help='LLM temperature (not applied to reasoning models)')
+    ann.add_argument('--max-retries', type=int, default=3, help='Max retry attempts per row (default: 3)')
+    ann.add_argument('--retry-delay', type=int, default=300, help='Base delay in seconds between retries (default: 300)')
     ann.add_argument('-d', '--debug', action='store_true', help='Print model name and a sample filled-in prompt for each model')
 
     # Evaluate command
@@ -33,6 +36,9 @@ def main():
             system_message_path=args.system_message,
             prompt_template_path=args.prompt_template,
             prompt_columns=args.prompt_columns,
+            temperature=args.temperature,
+            max_retries=args.max_retries,
+            retry_delay=args.retry_delay,
             debug=args.debug,
         )
         annotator.run(args.input, args.output)

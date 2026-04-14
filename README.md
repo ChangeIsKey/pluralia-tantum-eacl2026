@@ -2,6 +2,93 @@
 
 This repository includes the evaluation scripts used in the paper.
 
+## `llm_classifier` — LLM Annotation & Evaluation Toolkit
+
+A modular Python package for annotating linguistic data with LLMs and evaluating the results.
+
+### Installation
+
+```bash
+pip install openai pandas scikit-learn numpy
+```
+
+### Quick Start
+
+#### 1. Annotate (Zero-Shot)
+
+```bash
+python -m llm_classifier.cli annotate \
+    -i data/your_data.csv \
+    -o results/ \
+    -m gpt-4o-mini deepseek-chat \
+    --openai-key $OPENAI_API_KEY \
+    --deepseek-key $DEEPSEEK_API_KEY \
+    --system-message config/system_message.txt \
+    --prompt-template config/prompt_zeroshot.txt \
+    --prompt-columns text_clean
+```
+
+#### 2. Annotate (Few-Shot)
+
+```bash
+python -m llm_classifier.cli annotate \
+    -i data/your_data.csv \
+    -o results/ \
+    -m gpt-4o gpt-4o-mini \
+    --openai-key $OPENAI_API_KEY \
+    --system-message config/system_message.txt \
+    --prompt-template config/prompt_fewshot.txt \
+    --prompt-columns text_clean \
+    --temperature 0.7
+```
+
+#### 3. Evaluate
+
+```bash
+python -m llm_classifier.cli evaluate \
+    -p results/output_gpt-4o-mini.csv \
+    -g data/gold_standard.csv
+```
+
+### Features
+
+- **Multi-model support**: Runs the same prompt across multiple OpenAI and DeepSeek models in a single command.
+- **Resume-safe**: If a run is interrupted, re-running the same command will pick up where it left off.
+- **Flexible prompts**: Reference any CSV column in your prompt template via `{column_name}` placeholders.
+- **Robust parsing**: Extracts JSON from messy LLM outputs using regex + `ast.literal_eval` fallback.
+- **Multi-label evaluation**: Computes Exact Match Accuracy, Jaccard Similarity, and Micro-F1 scores.
+
+### Supported Models
+
+| Provider | Models |
+|----------|--------|
+| OpenAI | `gpt-4o`, `gpt-4o-mini`, `chatgpt-4o-latest`, `o1`, `o3-mini`, `o3`, `gpt-4.1-*` |
+| DeepSeek | `deepseek-chat`, `deepseek-reasoner` |
+
+### Python API
+
+```python
+from llm_classifier import Annotator, Parser, Evaluator
+
+# Annotate
+annotator = Annotator(
+    openai_api_key="sk-...",
+    models=["gpt-4o-mini"],
+    system_message_path="config/system_message.txt",
+    prompt_template_path="config/prompt_zeroshot.txt",
+)
+annotator.run("data/input.csv", output_dir="results/")
+
+# Parse
+parser = Parser(verbose=True)
+df_parsed = parser.parse_csv("results/output_gpt-4o-mini.csv")
+
+# Evaluate
+evaluator = Evaluator()
+metrics = evaluator.evaluate(df_parsed, "data/gold_standard.csv")
+print(metrics)
+```
+
 ## Citation
 
 ```bibtex
